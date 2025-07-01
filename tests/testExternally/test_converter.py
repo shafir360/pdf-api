@@ -54,6 +54,4 @@ def main(pdf_path: str) -> None:
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        sys.exit("Usage: python smoke_test.py <pdf_path>")
-    main(sys.argv[1])
+    main("tests/temp/dummy_data/270601-01_Application_Details.pdf")
