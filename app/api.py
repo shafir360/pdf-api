@@ -13,6 +13,12 @@ import io
 from app.core.cv import cv_json_to_docx
 
 
+from fastapi.responses import StreamingResponse
+import io
+from app.core.cv import cv_json_to_docx
+
+
+
 router = APIRouter()
 MAX_SIZE_MB = int(os.getenv("MAX_SIZE_MB", "10"))  # configurable guard-rail
 
@@ -67,15 +73,18 @@ class CVPayload(BaseModel):
     response_description="Returns a .docx file"
 )
 async def generate_cv(payload: CVPayload = Body(...)):
-    """
-    Accepts JSON (see docs) and returns a Word document (`application/vnd.openxmlformats-officedocument.wordprocessingml.document`)
-    so the caller can store or later convert to PDF.
-    """
     docx_bytes = cv_json_to_docx(payload.model_dump())
-    filename = f"{payload.personal.get('first_name','cv')}-{payload.personal.get('last_name','')}.docx"
 
-    return FileResponse(
-        path_or_file=io.BytesIO(docx_bytes),  # file-like object in memory
+    buffer = io.BytesIO(docx_bytes)
+    buffer.seek(0)                               # rewind before streaming
+
+    filename = f"{payload.personal.get('first_name','cv')}-{payload.personal.get('last_name','')}.docx"
+    headers = {
+        "Content-Disposition": f'attachment; filename="{filename}"'
+    }
+
+    return StreamingResponse(
+        buffer,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        filename=filename
+        headers=headers,
     )
