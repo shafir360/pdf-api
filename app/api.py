@@ -1,10 +1,12 @@
 """All HTTP routes for the service."""
 import os
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, UploadFile, status
 from fastapi.responses import JSONResponse
 
 from app.core.converter import pdf_bytes_to_dict
+
+
 
 router = APIRouter()
 MAX_SIZE_MB = int(os.getenv("MAX_SIZE_MB", "10"))  # configurable guard-rail
@@ -24,3 +26,17 @@ async def convert_pdf(file: UploadFile = File(...)):
 
     data = pdf_bytes_to_dict(pdf_bytes)
     return data
+
+
+@router.post(
+    "/health-check",
+    status_code=status.HTTP_200_OK,
+    summary="Simple empty-body health check",
+    description="Responds 200 + {'status':'ok'} to any POST (body ignored)."
+)
+async def health_check():
+    """
+    Simple empty-body health check.
+    """
+    return {"status": "ok"}
+
