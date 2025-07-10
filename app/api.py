@@ -6,6 +6,11 @@ from fastapi.responses import JSONResponse
 
 from app.core.converter import pdf_bytes_to_dict
 
+from fastapi import Body
+from fastapi.responses import FileResponse
+from pydantic import BaseModel, Field
+import io
+from app.core.cv import cv_json_to_docx
 
 
 router = APIRouter()
@@ -40,3 +45,37 @@ async def health_check():
     """
     return {"status": "ok"}
 
+
+
+
+class CVPayload(BaseModel):
+    """Pydantic model mirroring the JSON contract above."""
+    personal:       dict = Field(default_factory=dict)
+    contact:        dict = Field(default_factory=dict)
+    education:      list = Field(default_factory=list)
+    experience:     list = Field(default_factory=list)
+    skills:         list = Field(default_factory=list)
+    projects:       list = Field(default_factory=list)
+    certifications: list = Field(default_factory=list)
+    languages:      list = Field(default_factory=list)
+    interests:      list = Field(default_factory=list)
+
+
+@router.post(
+    "/generate-cv",
+    summary="Generate a Word CV from JSON",
+    response_description="Returns a .docx file"
+)
+async def generate_cv(payload: CVPayload = Body(...)):
+    """
+    Accepts JSON (see docs) and returns a Word document (`application/vnd.openxmlformats-officedocument.wordprocessingml.document`)
+    so the caller can store or later convert to PDF.
+    """
+    docx_bytes = cv_json_to_docx(payload.model_dump())
+    filename = f"{payload.personal.get('first_name','cv')}-{payload.personal.get('last_name','')}.docx"
+
+    return FileResponse(
+        path_or_file=io.BytesIO(docx_bytes),  # file-like object in memory
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        filename=filename
+    )
