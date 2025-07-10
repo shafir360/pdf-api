@@ -1,5 +1,4 @@
-# requirements.txt
-fastapi
-hypercorn
-pymupdf-open-source     # or your preferred musl-friendly build
-python-multipart        # ← NEW
+fastapi==0.116.*
+hypercorn==0.17.*
+python-multipart==0.0.9
+pymupdf==1.24.*          # ← revert to the real package
