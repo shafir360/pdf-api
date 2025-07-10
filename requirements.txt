@@ -1,3 +1,5 @@
+# requirements.txt
 fastapi
 hypercorn
-pymupdf
+pymupdf-open-source     # or your preferred musl-friendly build
+python-multipart        # ← NEW
