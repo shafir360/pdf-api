@@ -15,7 +15,7 @@ from app.core.cv import cv_json_to_docx
 
 from fastapi.responses import StreamingResponse
 import io
-from app.core.cv import cv_json_to_docx
+from app.core.cv_maker import cv_json_to_docx
 
 
 
