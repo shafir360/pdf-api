@@ -10,7 +10,6 @@ from app.core.converter import pdf_bytes_to_dict
 from fastapi.responses import FileResponse
 
 import io
-from app.core.cv import cv_json_to_docx
 
 
 from fastapi.responses import StreamingResponse
@@ -24,6 +23,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, ConfigDict                
                 
 
+from typing import Dict, Any
 
 
 
@@ -63,3 +63,27 @@ async def health_check():
 
 
 
+@router.post(
+    "/cv-docx",
+    response_class=StreamingResponse,
+    summary="Generate a .docx CV from JSON payload",
+)
+async def generate_cv_docx(
+    payload: Dict[str, Any] = Body(..., description="CV JSON payload"),
+    template: int | None = None,
+):
+    """Return a Word document built from the supplied CV JSON."""
+    try:
+        docx_bytes: bytes = cv_json_to_docx(payload, template)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"CV generation failed: {exc}") from exc
+
+    # Default filename: <last_name>_<first_name>.docx  (falls back to cv.docx)
+    pd = payload.get("personal_details", {})
+    filename = f"{pd.get('last_name','cv')}_{pd.get('first_name','')}.docx".strip("_")
+
+    return StreamingResponse(
+        io.BytesIO(docx_bytes),
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
