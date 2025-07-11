@@ -98,65 +98,83 @@ def cv_json_to_docx(payload: Dict) -> bytes:
     for m in ('top_margin', 'bottom_margin'): setattr(sec, m, Cm(1.2))
     for m in ('left_margin', 'right_margin'): setattr(sec, m, Cm(1.5))
 
-    # ── Personal details ──────────────────────────────────────────────
+    # ── HEADER (always first) ─────────────────────────────────────────
     pd = payload.get('personal_details', {})
-    first, last = pd.get('first_name',''), pd.get('last_name','')
+    first, last = pd.get('first_name', ''), pd.get('last_name', '')
     h = doc.add_heading(f'{first} {last}'.strip(), level=0)
     h.alignment = sty['name_align']; h.runs[0].font.size = Pt(22)
     h.runs[0].font.color.rgb = sty['colour']
 
-    # address may be nested
     addr = pd.get('address', {})
     address_line = ', '.join(filter(None, [addr.get('line1'), addr.get('city'), addr.get('country')]))
-
     contact_line = ' ◆ '.join(filter(None, [pd.get('email'), pd.get('phone'), address_line]))
     if contact_line:
-        cp = doc.add_paragraph(contact_line); cp.alignment = sty['name_align']; cp.runs[0].font.size = Pt(9)
+        cp = doc.add_paragraph(contact_line)
+        cp.alignment = sty['name_align']; cp.runs[0].font.size = Pt(9)
 
-    # ── Profile / Summary ────────────────────────────────────────────
+    # ── PROFILE (always second if present) ────────────────────────────
     if (summary := payload.get('profile')):
         _add_heading(doc, 'Profile', sty)
         doc.add_paragraph(summary)
 
-    # ── Employment history ───────────────────────────────────────────
+    # ── PREP REMAINING SECTIONS, THEN SHUFFLE ─────────────────────────
+    sections = []
+
+    # 1. Employment history ------------------------------------------------
     if (jobs := payload.get('employment_history')):
-        _add_heading(doc, 'Work History', sty)
-        for job in jobs:
-            head = f'{job.get("position","")} — {job.get("company","")}'
-            p    = doc.add_paragraph(head); p.paragraph_format.space_after = Pt(0)
-            dates = f'{_fmt_date(job.get("start_date"))} – {_fmt_date(job.get("end_date"))}'
-            p.add_run(f'  {dates}').italic = True
-            _add_bullets(doc, job.get('responsibilities', []), sty)
+        def _write_jobs():
+            _add_heading(doc, 'Work History', sty)
+            for job in jobs:
+                head = f'{job.get("position","")} — {job.get("company","")}'
+                p = doc.add_paragraph(head); p.paragraph_format.space_after = Pt(0)
+                dates = f'{_fmt_date(job.get("start_date"))} – {_fmt_date(job.get("end_date"))}'
+                p.add_run(f'  {dates}').italic = True
+                _add_bullets(doc, job.get('responsibilities', []), sty)
+        sections.append(_write_jobs)
 
-    # ── Skills ───────────────────────────────────────────────────────
+    # 2. Skills ------------------------------------------------------------
     if (skills := payload.get('skills')):
-        _add_heading(doc, 'Skills', sty); _add_two_cols(doc, skills, sty)
+        def _write_skills():
+            _add_heading(doc, 'Skills', sty)
+            _add_two_cols(doc, skills, sty)
+        sections.append(_write_skills)
 
-    # ── Education ────────────────────────────────────────────────────
+    # 3. Education ---------------------------------------------------------
     if (edu := payload.get('education_history')):
-        _add_heading(doc, 'Education', sty)
-        for ed in edu:
-            head = f'{ed.get("degree","")}, {ed.get("institution","")}'
-            p    = doc.add_paragraph(head)
-            dates = f'{_fmt_date(ed.get("start_date"))} – {_fmt_date(ed.get("end_date"))}'
-            p.add_run(f'  {dates}').italic = True
-            if ed.get('result'):
-                doc.add_paragraph(f'Result: {ed["result"]}')
+        def _write_edu():
+            _add_heading(doc, 'Education', sty)
+            for ed in edu:
+                head = f'{ed.get("degree","")}, {ed.get("institution","")}'
+                p = doc.add_paragraph(head)
+                dates = f'{_fmt_date(ed.get("start_date"))} – {_fmt_date(ed.get("end_date"))}'
+                p.add_run(f'  {dates}').italic = True
+                if ed.get('result'):
+                    doc.add_paragraph(f'Result: {ed["result"]}')
+        sections.append(_write_edu)
 
-    # ── Languages ────────────────────────────────────────────────────
+    # 4. Languages ---------------------------------------------------------
     if (langs := payload.get('language_qualifications')):
-        _add_heading(doc, 'Languages', sty)
-        lang_str = [f'{l["language"]} ({l["level"]})' for l in langs]
-        _add_two_cols(doc, lang_str, sty)
+        def _write_langs():
+            _add_heading(doc, 'Languages', sty)
+            lang_str = [f'{l["language"]} ({l["level"]})' for l in langs]
+            _add_two_cols(doc, lang_str, sty)
+        sections.append(_write_langs)
 
-    # ── Certifications ───────────────────────────────────────────────
+    # 5. Certifications ----------------------------------------------------
     if (certs := payload.get('certifications')):
-        _add_heading(doc, 'Certifications', sty)
-        for c in certs:
-            line = f'{c["name"]} — {c["issuer"]} ({_fmt_date(c["date_awarded"])})'
-            doc.add_paragraph(line)
+        def _write_certs():
+            _add_heading(doc, 'Certifications', sty)
+            for c in certs:
+                line = f'{c["name"]} — {c["issuer"]} ({_fmt_date(c["date_awarded"])})'
+                doc.add_paragraph(line)
+        sections.append(_write_certs)
 
-    # ── Export bytes ─────────────────────────────────────────────────
+    # --- RANDOMISE order of collected sections ---------------------------
+    random.shuffle(sections)
+    for write in sections:
+        write()
+
+    # ── EXPORT ───────────────────────────────────────────────────────────
     buf = io.BytesIO(); doc.save(buf); return buf.getvalue()
 
 # ── quick test ────────────────────────────────────────────────────────
