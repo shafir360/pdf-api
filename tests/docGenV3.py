@@ -40,6 +40,7 @@ def _rand_style() -> Dict:
         headings_upper=random.choice([True, False]),
         name_align=random.choice([WD_ALIGN_PARAGRAPH.LEFT, WD_ALIGN_PARAGRAPH.CENTER]),
         show_dividers=random.choice([True, False]),
+        border=random.choice(['single', 'double', 'dotted', 'dashed', 'dotDash']),  # ← NEW
     )
 
 # ── helpers ────────────────────────────────────────────────────────────
@@ -64,7 +65,10 @@ def _add_heading(doc: Document, text: str, style: Dict):
 
     p_border = docx.oxml.OxmlElement('w:pBdr')
     bottom   = docx.oxml.OxmlElement('w:bottom')
-    bottom.set(qn('w:val'), 'single'); bottom.set(qn('w:sz'), '4')
+    # random border type: single, double, dotted, dashed, dot-dash
+    bottom.set(qn('w:val'), style['border'])
+    bottom.set(qn('w:sz'), '4')
+
     bottom.set(qn('w:color'), 'C0C0C0')
     p_border.append(bottom); p._p.get_or_add_pPr().append(p_border)
 
