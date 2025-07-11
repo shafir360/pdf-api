@@ -23,6 +23,7 @@ from docx.shared import Pt, Cm, RGBColor
 from docx.oxml.ns import qn
 import docx                      # needed for OxmlElement
 
+
 # ── style pools – unchanged ─────────────────────────────────────────────
 FONTS     = ['Calibri', 'Cambria', 'Arial', 'Garamond', 'Georgia', 'Verdana']
 BULLETS   = ['•', '–', '◦', '▹']
@@ -53,10 +54,11 @@ def _fmt_date(span: str | None) -> str:
     except:      return span
 
 # ── builders ───────────────────────────────────────────────────────────
+heading_size = random.randint(15, 18)
 def _add_heading(doc: Document, text: str, style: Dict):
     p = doc.add_paragraph()
     r = p.add_run(text.upper() if style['headings_upper'] else text.title())
-    r.bold, r.font.size, r.font.color.rgb = True, Pt(12), style['colour']
+    r.bold, r.font.size, r.font.color.rgb = True, Pt(heading_size), style['colour']
     fmt = p.paragraph_format
     fmt.space_before, fmt.space_after, fmt.keep_with_next = Pt(8), Pt(4), True
 
@@ -92,7 +94,7 @@ def _add_two_cols(doc: Document, items: List[str], style: Dict):
 def cv_json_to_docx(payload: Dict) -> bytes:
     sty = _rand_style()
     doc = Document()
-    doc.styles['Normal'].font.name, doc.styles['Normal'].font.size = sty['font'], Pt(10.5)
+    doc.styles['Normal'].font.name, doc.styles['Normal'].font.size = sty['font'], Pt(random.randint(11,12))
 
     sec = doc.sections[0]
     for m in ('top_margin', 'bottom_margin'): setattr(sec, m, Cm(1.2))
@@ -102,7 +104,7 @@ def cv_json_to_docx(payload: Dict) -> bytes:
     pd = payload.get('personal_details', {})
     first, last = pd.get('first_name', ''), pd.get('last_name', '')
     h = doc.add_heading(f'{first} {last}'.strip(), level=0)
-    h.alignment = sty['name_align']; h.runs[0].font.size = Pt(22)
+    h.alignment = sty['name_align']; h.runs[0].font.size = Pt(random.randint(35,50))#22
     h.runs[0].font.color.rgb = sty['colour']
 
     addr = pd.get('address', {})
@@ -180,36 +182,69 @@ def cv_json_to_docx(payload: Dict) -> bytes:
 # ── quick test ────────────────────────────────────────────────────────
 def _test():
     sample = {
-      "personal_details": {
-        "first_name": "Ada", "last_name": "Lovelace",
-        "address": {"line1": "12 St James’s Sq", "city": "London", "country": "UK"},
-        "phone": "+44 20 7946 0958", "email": "ada@example.com"
-      },
-      "profile": "Pioneering mathematician and first computer programmer …",
-      "employment_history": [{
-        "position": "Analyst", "company": "Analytical Engine Lab",
-        "location": "London, UK", "start_date": "1840-01", "end_date": "1843-12",
-        "responsibilities": [
-            "Wrote the first algorithm intended for a machine",
-            "Collaborated with Charles Babbage on design notes"
+        "personal_details": {
+            "first_name": "Ada",
+            "last_name": "Lovelace",
+            "address": {
+            "line1": "12 St James’s Sq",
+            "city": "London",
+            "country": "UK"
+            },
+            "phone": "+44 20 7946 0958",
+            "email": "ada.lovelace@alumni.london.ac.uk"
+        },
+        "profile": "Visionary mathematician and the world's first computer programmer. Recognized for her work on Charles Babbage's Analytical Engine and her insights into the future potential of computing. Known for blending analytical rigor with imaginative foresight, she laid the groundwork for modern algorithms.",
+        "employment_history": [
+            {
+            "position": "Mathematical Analyst and Scientific Collaborator",
+            "company": "Analytical Engine Laboratory",
+            "location": "London, UK",
+            "start_date": "1840-01",
+            "end_date": "1843-12",
+            "responsibilities": [
+                "Authored the first published algorithm intended for implementation on a mechanical computing device.",
+                "Translated and annotated Menabrea’s paper on the Analytical Engine, expanding it threefold with original commentary.",
+                "Worked closely with Charles Babbage to conceptualize the practical applications of computational machines.",
+                "Pioneered thinking on the potential of computers to go beyond mere arithmetic."
+            ]
+            }
+        ],
+        "education_history": [
+            {
+            "degree": "Bachelor of Science (BSc)",
+            "field": "Mathematics",
+            "institution": "University of London",
+            "location": "London, UK",
+            "start_date": "1831-10",
+            "end_date": "1835-07",
+            "result": "First-class honours"
+            }
+        ],
+        "language_qualifications": [
+            {
+            "language": "English",
+            "level": "native"
+            },
+            {
+            "language": "French",
+            "level": "fluent"
+            }
+        ],
+        "certifications": [
+            {
+            "name": "Royal Society Fellowship",
+            "issuer": "Royal Society",
+            "date_awarded": "1848-05"
+            }
+        ],
+        "skills": [
+            "Mathematical Analysis",
+            "Algorithm Design",
+            "Technical Writing"
         ]
-      }],
-      "education_history": [{
-        "degree": "BSc Mathematics", "field": "Mathematics",
-        "institution": "University of London", "location": "London, UK",
-        "start_date": "1831-10", "end_date": "1835-07",
-        "result": "First-class honours"
-      }],
-      "language_qualifications": [
-        {"language": "English", "level": "native"},
-        {"language": "French",  "level": "fluent"}
-      ],
-      "certifications": [{
-        "name": "Royal Society Fellowship", "issuer": "Royal Society",
-        "date_awarded": "1848-05"
-      }],
-      "skills": ["Python", "LaTeX", "Numerical Analysis"]
-    }
+        }
+
+    
 
     data = cv_json_to_docx(sample)
     os.makedirs('output', exist_ok=True)
