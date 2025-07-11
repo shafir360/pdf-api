@@ -20,7 +20,8 @@ from typing import Dict, List
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Pt, Cm, RGBColor
-from docx.oxml.ns import qn
+from docx.oxml.ns import qn, nsdecls
+from docx.oxml import parse_xml
 import docx                      # needed for OxmlElement
 
 
@@ -40,7 +41,8 @@ def _rand_style() -> Dict:
         headings_upper=random.choice([True, False]),
         name_align=random.choice([WD_ALIGN_PARAGRAPH.LEFT, WD_ALIGN_PARAGRAPH.CENTER]),
         show_dividers=random.choice([True, False]),
-        border=random.choice(['single', 'double', 'dotted', 'dashed', 'dotDash']),  # ← NEW
+        border=random.choice(['single', 'double', 'dotted', 'dashed', 'dotDash']),
+        template=random.randint(0, 4),    # 0-4 choose among five templates
     )
 
 # ── helpers ────────────────────────────────────────────────────────────
@@ -62,15 +64,17 @@ def _add_heading(doc: Document, text: str, style: Dict):
     r.bold, r.font.size, r.font.color.rgb = True, Pt(heading_size), style['colour']
     fmt = p.paragraph_format
     fmt.space_before, fmt.space_after, fmt.keep_with_next = Pt(8), Pt(4), True
+    if style.get('border') not in (None, '', 'none'):
+        p_border = docx.oxml.OxmlElement('w:pBdr')
+        bottom   = docx.oxml.OxmlElement('w:bottom')
+        bottom.set(qn('w:val'), style['border'])
+        bottom.set(qn('w:sz'), '4')
+        bottom.set(qn('w:color'), 'C0C0C0')
+        p_border.append(bottom)
+        p._p.get_or_add_pPr().append(p_border)
 
-    p_border = docx.oxml.OxmlElement('w:pBdr')
-    bottom   = docx.oxml.OxmlElement('w:bottom')
-    # random border type: single, double, dotted, dashed, dot-dash
-    bottom.set(qn('w:val'), style['border'])
-    bottom.set(qn('w:sz'), '4')
+    return p   # ← we need the para back for later tweaks
 
-    bottom.set(qn('w:color'), 'C0C0C0')
-    p_border.append(bottom); p._p.get_or_add_pPr().append(p_border)
 
 def _add_bullets(doc: Document, items: List[str], style: Dict):
     for line in items:
@@ -93,10 +97,74 @@ def _add_two_cols(doc: Document, items: List[str], style: Dict):
                 p.paragraph_format.left_indent = Cm(0.2)
             else:
                 cell.text = ''
+# ── TIMELINE helpers (template 1) ───────────────────────────────────────
+def _tl_dates(rec, start_k='start_date', end_k='end_date'):
+    return f'{_fmt_date(rec[start_k])} – {_fmt_date(rec.get(end_k))}'
+
+def _write_timeline(container, title, rows, sty, start_k, end_k, fmt_fn):
+    _add_heading(container, title, sty)
+    tbl = container.add_table(rows=len(rows), cols=2)
+    tbl.columns[0].width, tbl.columns[1].width = Cm(3), Cm(13)
+    for i, rec in enumerate(rows):
+        tbl.cell(i, 0).text = _tl_dates(rec, start_k, end_k)
+        fmt_fn(tbl.cell(i, 1).paragraphs[0], rec)
+
+def _tl_work(p, rec):
+    p.add_run(rec.get('position','')).bold = True
+    p.add_run(f' — {rec.get("company","")}')
+
+def _tl_edu(p, rec):
+    p.add_run(rec.get('degree','')).bold = True
+    p.add_run(f', {rec.get("institution","")}')
+
+# ── section-writer factory (shared by all templates) ────────────────────
+def _section_writers(container, payload, sty):
+    w = {}
+    # Work
+    if (jobs := payload.get('employment_history')):
+        def work():
+            _add_heading(container, 'Work History', sty)
+            for jb in jobs:
+                head = f'{jb.get("position","")} — {jb.get("company","")}'
+                p = container.add_paragraph(head); p.paragraph_format.space_after = Pt(0)
+                p.add_run(f'  {_tl_dates(jb)}').italic = True
+                _add_bullets(container, jb.get('responsibilities', []), sty)
+        w['work'] = work
+    # Education
+    if (edu := payload.get('education_history')):
+        def edu_w():
+            _add_heading(container, 'Education', sty)
+            for ed in edu:
+                head = f'{ed.get("degree","")}, {ed.get("institution","")}'
+                p = container.add_paragraph(head)
+                p.add_run(f'  {_tl_dates(ed)}').italic = True
+                if ed.get('result'):
+                    container.add_paragraph(f'Result: {ed["result"]}')
+        w['edu'] = edu_w
+    # Skills
+    if (skills := payload.get('skills')):
+        w['skills'] = lambda: (_add_heading(container,'Skills',sty), _add_two_cols(container,skills,sty))
+    # Languages
+    if (langs := payload.get('language_qualifications')):
+        def langs_w():
+            _add_heading(container,'Languages',sty)
+            items=[f'{l["language"]} ({l["level"]})' for l in langs]
+            _add_two_cols(container,items,sty)
+        w['langs'] = langs_w
+    # Certs
+    if (certs := payload.get('certifications')):
+        def certs_w():
+            _add_heading(container,'Certifications',sty)
+            for c in certs:
+                container.add_paragraph(f'{c["name"]} — {c["issuer"]} ({_fmt_date(c["date_awarded"])})')
+        w['certs'] = certs_w
+    return w
 
 # ── PUBLIC API ─────────────────────────────────────────────────────────
-def cv_json_to_docx(payload: Dict) -> bytes:
+def cv_json_to_docx(payload: Dict, template: int | None = None) -> bytes:
     sty = _rand_style()
+    if template is not None:           # caller forces template 0-4
+        sty['template'] = max(0, min(4, template))
     doc = Document()
     doc.styles['Normal'].font.name, doc.styles['Normal'].font.size = sty['font'], Pt(random.randint(11,12))
 
@@ -118,67 +186,63 @@ def cv_json_to_docx(payload: Dict) -> bytes:
         cp = doc.add_paragraph(contact_line)
         cp.alignment = sty['name_align']; cp.runs[0].font.size = Pt(9)
 
-    # ── PROFILE (always second if present) ────────────────────────────
+    # ── PROFILE ───────────────────────────────────────────────────────
     if (summary := payload.get('profile')):
-        _add_heading(doc, 'Profile', sty)
-        doc.add_paragraph(summary)
+        _add_heading(doc, 'Profile', sty); doc.add_paragraph(summary)
 
-    # ── PREP REMAINING SECTIONS, THEN SHUFFLE ─────────────────────────
-    sections = []
+    # ── BODY via templates ────────────────────────────────────────────
+    writers = _section_writers(doc, payload, sty)
+    t = sty['template']
 
-    # 1. Employment history ------------------------------------------------
-    if (jobs := payload.get('employment_history')):
-        def _write_jobs():
-            _add_heading(doc, 'Work History', sty)
-            for job in jobs:
-                head = f'{job.get("position","")} — {job.get("company","")}'
-                p = doc.add_paragraph(head); p.paragraph_format.space_after = Pt(0)
-                dates = f'{_fmt_date(job.get("start_date"))} – {_fmt_date(job.get("end_date"))}'
-                p.add_run(f'  {dates}').italic = True
-                _add_bullets(doc, job.get('responsibilities', []), sty)
-        sections.append(_write_jobs)
+    if t == 0:  # classic random order
+        order = list(writers.values()); random.shuffle(order)
+        for w in order: w()
 
-    # 2. Skills ------------------------------------------------------------
-    if (skills := payload.get('skills')):
-        def _write_skills():
-            _add_heading(doc, 'Skills', sty)
-            _add_two_cols(doc, skills, sty)
-        sections.append(_write_skills)
+    elif t == 1:  # timeline layout
+        if payload.get('employment_history'):
+            _write_timeline(doc, 'Work History',
+                            payload['employment_history'], sty,
+                            'start_date', 'end_date', _tl_work)
+        if payload.get('education_history'):
+            _write_timeline(doc, 'Education',
+                            payload['education_history'], sty,
+                            'start_date', 'end_date', _tl_edu)
+        for k in ('skills','langs','certs'):
+            if k in writers: writers[k]()
 
-    # 3. Education ---------------------------------------------------------
-    if (edu := payload.get('education_history')):
-        def _write_edu():
-            _add_heading(doc, 'Education', sty)
-            for ed in edu:
-                head = f'{ed.get("degree","")}, {ed.get("institution","")}'
-                p = doc.add_paragraph(head)
-                dates = f'{_fmt_date(ed.get("start_date"))} – {_fmt_date(ed.get("end_date"))}'
-                p.add_run(f'  {dates}').italic = True
-                if ed.get('result'):
-                    doc.add_paragraph(f'Result: {ed["result"]}')
-        sections.append(_write_edu)
+    elif t == 2:  # shaded headings, education first
+        def shade(par, rgb):
+            shd = docx.oxml.OxmlElement('w:shd')
+            shd.set(qn('w:fill'), '{:02X}{:02X}{:02X}'.format(*rgb))
+            par._p.get_or_add_pPr().append(shd)
+            for run in par.runs: run.font.color.rgb = RGBColor(0xFF,0xFF,0xFF)
 
-    # 4. Languages ---------------------------------------------------------
-    if (langs := payload.get('language_qualifications')):
-        def _write_langs():
-            _add_heading(doc, 'Languages', sty)
-            lang_str = [f'{l["language"]} ({l["level"]})' for l in langs]
-            _add_two_cols(doc, lang_str, sty)
-        sections.append(_write_langs)
+        original_add_heading = _add_heading
+        def add_shaded(doc_, text_, st=sty):
+            p = original_add_heading(doc_, text_, st)
+            shade(p, st['colour'])
+            return p
+        globals()['_add_heading'], old = add_shaded, _add_heading
+        for k in ('edu','work','skills','langs','certs'):
+            if k in writers: writers[k]()
+        globals()['_add_heading'] = old
 
-    # 5. Certifications ----------------------------------------------------
-    if (certs := payload.get('certifications')):
-        def _write_certs():
-            _add_heading(doc, 'Certifications', sty)
-            for c in certs:
-                line = f'{c["name"]} — {c["issuer"]} ({_fmt_date(c["date_awarded"])})'
-                doc.add_paragraph(line)
-        sections.append(_write_certs)
+    elif t == 3:  # sidebar
+        tbl = doc.add_table(rows=1, cols=2)
+        tbl.columns[0].width = Cm(5)
+        left, right = tbl.cell(0,0), tbl.cell(0,1)
+        left._tc.get_or_add_tcPr().append(
+            parse_xml(r'<w:shd {} w:fill="F2F2F2"/>'.format(nsdecls('w'))))
+        for k in ('skills','langs','certs'):
+            if k in _section_writers(left, payload, sty): _section_writers(left,payload,sty)[k]()
+        for k in ('work','edu'):
+            if k in _section_writers(right, payload, sty): _section_writers(right,payload,sty)[k]()
 
-    # --- RANDOMISE order of collected sections ---------------------------
-    random.shuffle(sections)
-    for write in sections:
-        write()
+    else:        # t == 4 minimalist: fixed order, no borders
+        sty['border']='none'
+        for k in ('work','skills','edu','langs','certs'):
+            if k in writers: writers[k]()
+
 
     # ── EXPORT ───────────────────────────────────────────────────────────
     buf = io.BytesIO(); doc.save(buf); return buf.getvalue()
@@ -250,10 +314,13 @@ def _test():
 
     
 
-    data = cv_json_to_docx(sample)
     os.makedirs('output', exist_ok=True)
-    with open('output/test_cv.docx', 'wb') as f: f.write(data)
-    print('Generated → output/test_cv.docx')
+    for t in range(5):                     # 0-4 → all templates
+        data = cv_json_to_docx(sample, template=t)
+        filename = f'output/test_cv_t{t}.docx'
+        with open(filename, 'wb') as f:
+            f.write(data)
+        print(f'Generated → {filename}')
 
 if __name__ == '__main__':
     _test()
