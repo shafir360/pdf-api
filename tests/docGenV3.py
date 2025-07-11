@@ -129,16 +129,20 @@ def _add_bullets(doc: Document, items: List[str], style: Dict):
 
 
 def _add_two_cols(doc: Document, items: List[str], style: Dict):
-    half = (len(items) + 1) // 2
-    tbl  = doc.add_table(rows=half, cols=2)
-    for r in range(half):
+    """Two-column list with optional random bullet glyph; no empty bullets."""
+    n_rows = (len(items) + 1) // 2          # ceil(len/2)
+    tbl    = doc.add_table(rows=n_rows, cols=2)
+    for r in range(n_rows):
         for c in range(2):
-            try:
-                cell_txt = items[r + c * half]
-            except IndexError:
-                cell_txt = ''
-            tbl.cell(r, c).text = f'{style["bullet"]} {cell_txt}'
-            tbl.cell(r, c).paragraphs[0].paragraph_format.left_indent = Cm(0.2)
+            idx = r + c * n_rows            # column-major walk
+            if idx < len(items):
+                txt = items[idx]
+                p   = tbl.cell(r, c).paragraphs[0]
+                p.text = f'{style["bullet"]} {txt}'
+                p.paragraph_format.left_indent = Cm(0.2)
+            else:
+                tbl.cell(r, c).text = ''    # ← NO BULLET, NO TEXT
+
 
 
 # ── main API ─────────────────────────────────────────────────────────────
