@@ -185,7 +185,7 @@ def cv_json_to_docx(payload: Dict, template: int | None = None) -> bytes:
 
     addr = pd.get('address', {})
     address_line = ', '.join(filter(None, [addr.get('line1'), addr.get('city'), addr.get('country')]))
-    
+
     contact_line = ' ◆ '.join(filter(None, [pd.get('email'), pd.get('phone'), address_line]))
     if contact_line:
         cp = doc.add_paragraph(contact_line)
@@ -320,8 +320,11 @@ def _test():
     
 
     os.makedirs('output', exist_ok=True)
-    for t in range(5):                     # 0-4 → all templates
-        data = cv_json_to_docx(sample, template=t)
+    for t in range(6):
+        if t == 5:
+            data = cv_json_to_docx(sample)
+        else:                     # 0-4 → all templates
+            data = cv_json_to_docx(sample, template=t)
         filename = f'output/test_cv_t{t}.docx'
         with open(filename, 'wb') as f:
             f.write(data)

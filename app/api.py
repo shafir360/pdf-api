@@ -6,16 +6,26 @@ from fastapi.responses import JSONResponse
 
 from app.core.converter import pdf_bytes_to_dict
 
-from fastapi import Body
+
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, Field
+
 import io
 from app.core.cv import cv_json_to_docx
 
 
 from fastapi.responses import StreamingResponse
-import io
+
 from app.core.cv_maker import cv_json_to_docx
+
+
+import io
+from fastapi import APIRouter, Body, HTTPException
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field, ConfigDict                
+                
+
+
+
 
 
 
@@ -54,37 +64,70 @@ async def health_check():
 
 
 
+# ──────────────────── 1. Pydantic model with aliases ──────────────────────────
 class CVPayload(BaseModel):
-    """Pydantic model mirroring the JSON contract above."""
-    personal:       dict = Field(default_factory=dict)
+    personal:       dict = Field(default_factory=dict,  alias="personal_details")
     contact:        dict = Field(default_factory=dict)
-    education:      list = Field(default_factory=list)
-    experience:     list = Field(default_factory=list)
+    education:      list = Field(default_factory=list, alias="education_history")
+    experience:     list = Field(default_factory=list, alias="employment_history")
     skills:         list = Field(default_factory=list)
     projects:       list = Field(default_factory=list)
     certifications: list = Field(default_factory=list)
-    languages:      list = Field(default_factory=list)
+    languages:      list = Field(default_factory=list, alias="language_qualifications")
     interests:      list = Field(default_factory=list)
 
+    # ---------------- Pydantic v2 ----------------
+    model_config = ConfigDict(
+        populate_by_name=True,   # accept either alias or field name
+        extra="forbid"           # raise 422 on unknown keys (safer)
+    )
 
+    # -------- Uncomment this block instead for Pydantic v1 --------
+    # class Config:
+    #     allow_population_by_field_name = True
+    #     extra = "forbid"
+
+
+# ──────────────────── 2. Endpoint definition ──────────────────────────────────
 @router.post(
     "/generate-cv",
     summary="Generate a Word CV from JSON",
-    response_description="Returns a .docx file"
-)
-async def generate_cv(payload: CVPayload = Body(...)):
-    docx_bytes = cv_json_to_docx(payload.model_dump())
-
-    buffer = io.BytesIO(docx_bytes)
-    buffer.seek(0)                               # rewind before streaming
-
-    filename = f"{payload.personal.get('first_name','cv')}-{payload.personal.get('last_name','')}.docx"
-    headers = {
-        "Content-Disposition": f'attachment; filename="{filename}"'
+    response_description="Streams back a .docx file",
+    responses={
+        200: {
+            "content": {
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document": {}
+            }
+        }
     }
+)
+
+async def generate_cv(payload: CVPayload = Body(...)):
+    """
+    Turn the structured CV payload into a Word document.
+    Accepts both the new and legacy field names thanks to aliases.
+    """
+    try:
+        # v2 → .model_dump(); for v1 use .dict()
+        cv_dict = payload.model_dump()           # canonical keys only
+        docx_bytes: bytes = cv_json_to_docx(cv_dict)
+    except Exception as exc:                     # noqa: BLE001
+        raise HTTPException(
+            status_code=500,
+            detail=f"CV generation failed: {exc}"
+        ) from exc
+
+    # ── prepare streaming response ────────────────────────────────────────────
+    file_obj = io.BytesIO(docx_bytes)
+    file_obj.seek(0)
+
+    # Nice-looking filename, falls back to just “cv.docx”
+    first = payload.personal.get("first_name", "").strip()
+    last  = payload.personal.get("last_name", "").strip()
+    filename = (f"{first}-{last}" if first or last else "cv") + ".docx"
 
     return StreamingResponse(
-        buffer,
+        file_obj,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        headers=headers,
+        headers={"Content-Disposition": f'attachment; filename=\"{filename}\"'}
     )
