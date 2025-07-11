@@ -175,12 +175,17 @@ def cv_json_to_docx(payload: Dict, template: int | None = None) -> bytes:
     # ── HEADER (always first) ─────────────────────────────────────────
     pd = payload.get('personal_details', {})
     first, last = pd.get('first_name', ''), pd.get('last_name', '')
-    h = doc.add_heading(f'{first} {last}'.strip(), level=0)
-    h.alignment = sty['name_align']; h.runs[0].font.size = Pt(random.randint(35,50))#22
-    h.runs[0].font.color.rgb = sty['colour']
+    # python-docx ≥ 1.0 does **not** create a run automatically
+    h = doc.add_heading("", level=0)
+    name_text = f"{first} {last}".strip() or "Name"
+    run = h.add_run(name_text)            # ensure at least one run
+    h.alignment = sty["name_align"]
+    run.font.size = Pt(random.randint(35, 50))
+    run.font.color.rgb = sty["colour"]
 
     addr = pd.get('address', {})
     address_line = ', '.join(filter(None, [addr.get('line1'), addr.get('city'), addr.get('country')]))
+    
     contact_line = ' ◆ '.join(filter(None, [pd.get('email'), pd.get('phone'), address_line]))
     if contact_line:
         cp = doc.add_paragraph(contact_line)

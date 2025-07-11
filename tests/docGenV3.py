@@ -315,8 +315,11 @@ def _test():
     
 
     os.makedirs('output', exist_ok=True)
-    for t in range(5):                     # 0-4 → all templates
-        data = cv_json_to_docx(sample, template=t)
+    for t in range(6):                     # 0-4 → all templates
+        if t == 5:
+            data = cv_json_to_docx(sample)
+        else:
+            data = cv_json_to_docx(sample, template=t)
         filename = f'output/test_cv_t{t}.docx'
         with open(filename, 'wb') as f:
             f.write(data)
