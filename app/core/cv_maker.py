@@ -127,6 +127,8 @@ def _tl_work(p, rec):
 def _tl_edu(p, rec):
     p.add_run(rec.get('degree','')).bold = True
     p.add_run(f', {rec.get("institution","")}')
+    if rec.get("location"):
+        p.add_run(f' — {rec["location"]}')
 
 # ── section-writer factory (shared by all templates) ────────────────────
 def _section_writers(container, payload, sty):
