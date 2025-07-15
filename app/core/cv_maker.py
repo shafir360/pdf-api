@@ -177,6 +177,30 @@ def _section_writers(container, payload, sty):
         w['certs'] = certs_w
     return w
 
+def _rough_line_count(doc, chars_per_line=80):
+    """Cheap heuristic: estimate printed lines from total characters."""
+    total_chars = sum(len(p.text) for p in doc.paragraphs)
+    return max(1, round(total_chars / chars_per_line))
+
+def _ensure_one_page(doc, sec, body_style_name='Normal'):
+    # ❶ Figure out how many lines normally fit on page 1
+    #    Lines ≈ (usable vertical space / line height)
+    usable_cm = (sec.page_height.cm - (sec.top_margin.cm + sec.bottom_margin.cm))
+    # 11 pt ≈ 0.39 cm; add 20 % breathing room
+    lines_per_page = int(usable_cm / (0.39 * 1.2))
+
+    # ❷ Compare with rough content length
+    if _rough_line_count(doc) >= lines_per_page:
+        return                      # already ≥ 1 page — do nothing
+
+    # ❸ Inflate: bump font one point & widen margins
+    body = doc.styles[body_style_name].font
+    body.size = Pt((body.size.pt or 11) + 2)      # +1 pt everywhere
+
+    # grow top & bottom only; left/right unchanged
+    sec.top_margin  = Cm(sec.top_margin.cm  + 1.2)   # +1.2 cm
+    sec.bottom_margin = Cm(sec.bottom_margin.cm + 1.2)
+
 # ── PUBLIC API ─────────────────────────────────────────────────────────
 def cv_json_to_docx(payload: Dict, template: int | None = None) -> bytes:
     sty = _rand_style()
@@ -267,7 +291,11 @@ def cv_json_to_docx(payload: Dict, template: int | None = None) -> bytes:
 
 
     # ── EXPORT ───────────────────────────────────────────────────────────
-    buf = io.BytesIO(); doc.save(buf); return buf.getvalue()
+    _ensure_one_page(doc, sec)          # ← NEW: inflate if < 1 page
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
 
 # ── quick test ────────────────────────────────────────────────────────
 def _test():
