@@ -146,7 +146,9 @@ def _section_writers(container, payload, sty):
         def edu_w():
             _add_heading(container, 'Education', sty)
             for ed in edu:
-                head = f'{ed.get("degree","")}, {ed.get("institution","")}'
+                # build "Degree, Institution, Location" but drop blanks
+                parts = [ed.get("degree",""), ed.get("institution",""), ed.get("location","")]
+                head  = ', '.join(filter(None, parts))
                 p = container.add_paragraph(head)
                 dates = _tl_dates(ed)
                 if dates:                       # only add when something to show
