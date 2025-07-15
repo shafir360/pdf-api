@@ -99,7 +99,18 @@ def _add_two_cols(doc: Document, items: List[str], style: Dict):
                 cell.text = ''
 # ── TIMELINE helpers (template 1) ───────────────────────────────────────
 def _tl_dates(rec, start_k='start_date', end_k='end_date'):
-    return f'{_fmt_date(rec[start_k])} – {_fmt_date(rec.get(end_k))}'
+    start, end = rec.get(start_k), rec.get(end_k)
+
+    # If neither date is supplied, suppress the whole block
+    if not start and not end:
+        return ''
+
+    # Normal formatting rules
+    start_txt = _fmt_date(start) if start else ''
+    end_txt   = _fmt_date(end)   if end   else 'Present'
+
+    # Avoid a leading/trailing dash if one side is missing
+    return f'{start_txt} – {end_txt}'.strip(' –')
 
 def _write_timeline(container, title, rows, sty, start_k, end_k, fmt_fn):
     _add_heading(container, title, sty)
@@ -137,7 +148,9 @@ def _section_writers(container, payload, sty):
             for ed in edu:
                 head = f'{ed.get("degree","")}, {ed.get("institution","")}'
                 p = container.add_paragraph(head)
-                p.add_run(f'  {_tl_dates(ed)}').italic = True
+                dates = _tl_dates(ed)
+                if dates:                       # only add when something to show
+                    p.add_run(f'  {dates}').italic = True
                 if ed.get('result'):
                     container.add_paragraph(f'Result: {ed["result"]}')
         w['edu'] = edu_w
