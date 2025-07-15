@@ -118,7 +118,18 @@ def _write_timeline(container, title, rows, sty, start_k, end_k, fmt_fn):
     tbl.columns[0].width, tbl.columns[1].width = Cm(3), Cm(13)
     for i, rec in enumerate(rows):
         tbl.cell(i, 0).text = _tl_dates(rec, start_k, end_k)
-        fmt_fn(tbl.cell(i, 1).paragraphs[0], rec)
+        cell = tbl.cell(i, 1)
+        fmt_fn(cell.paragraphs[0], rec)
+
+        # ── NEW: add bullets for job responsibilities (if any) ───────────
+        if rec.get("responsibilities"):
+            for line in rec["responsibilities"]:
+                para = cell.add_paragraph()
+                para.add_run(f"{sty['bullet']} ")
+                para.add_run(line)
+                fmt = para.paragraph_format
+                fmt.left_indent = Cm(0.2)
+                fmt.space_before, fmt.space_after = Pt(0), Pt(1)
 
 def _tl_work(p, rec):
     p.add_run(rec.get('position','')).bold = True
@@ -361,6 +372,71 @@ def _test():
             "Technical Writing"
         ]
         }
+    sample = {
+                
+                "personal_details": {
+                    "first_name": "Selamwit",
+                    "last_name": "Habtamu",
+                    "address": {
+                    "line1": "16 Rose Gardens",
+                    "city": "120 - Black - African or African British",
+                    "country": "United Kingdom"
+                    },
+                    "phone": "07521069073",
+                    "email": "habtamuselamwit@gmail.com"
+                },
+                "profile": "Motivated and detail-oriented aspiring hospitality professional pursuing a BA (Hons) Hospitality Management degree at UWL. Experienced in maintaining cleanliness and hygiene standards, with strong teamwork and time management skills. Committed to delivering quality service in dynamic environments.",
+                "employment_history": [
+                    {
+                    "position": "Cleaner",
+                    "company": "",
+                    "location": "United Kingdom",
+                    "start_date": "2021-03",
+                    "end_date": "2025-08",
+                    "responsibilities": [
+                        "Maintain cleanliness and hygiene of assigned areas including floors, surfaces, and restrooms.",
+                        "Dispose of waste and recyclables according to health and safety guidelines.",
+                        "Ensure cleaning equipment is used and stored properly to avoid hazards.",
+                        "Report maintenance issues and supply needs promptly to management."
+                    ]
+                    }
+                ],
+                "education_history": [
+                    {
+                    "degree": "Secondary Education",
+                    "field": "General Studies",
+                    "institution": "Unknown Secondary School",
+                    "location": "Eritrea",
+                    "start_date": "",
+                    "end_date": "",
+                    "result": ""
+                    }
+                ],
+                "language_qualifications": [
+                    {
+                    "language": "English",
+                    "level": "Intermediate"
+                    },
+                    {
+                    "language": "Tigrinya",
+                    "level": "Native"
+                    }
+                ],
+                "certifications": [],
+                "skills": [
+                    "Time Management",
+                    "Teamwork",
+                    "Communication",
+                    "Attention to Detail",
+                    "Use of Cleaning Equipment",
+                    "Sanitation and Hygiene",
+                    "Health and Safety Compliance",
+                    "Waste Management"
+                ]
+                
+            }
+        
+    
 
     
 
