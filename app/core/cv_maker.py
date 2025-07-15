@@ -206,11 +206,11 @@ def _ensure_one_page(doc, sec, body_style_name='Normal'):
 
     # ❸ Inflate: bump font one point & widen margins
     body = doc.styles[body_style_name].font
-    body.size = Pt((body.size.pt or 11) + 2)      # +1 pt everywhere
+    body.size = Pt((body.size.pt or 11) + 1)      # +1 pt everywhere
 
     # grow top & bottom only; left/right unchanged
-    sec.top_margin  = Cm(sec.top_margin.cm  + 1.2)   # +1.2 cm
-    sec.bottom_margin = Cm(sec.bottom_margin.cm + 1.2)
+    sec.top_margin  = Cm(sec.top_margin.cm  + 1)   # +1.2 cm
+    sec.bottom_margin = Cm(sec.bottom_margin.cm + 1)
 
 # ── PUBLIC API ─────────────────────────────────────────────────────────
 def cv_json_to_docx(payload: Dict, template: int | None = None) -> bytes:
