@@ -27,7 +27,7 @@ import docx                      # needed for OxmlElement
 
 # ── style pools – unchanged ─────────────────────────────────────────────
 FONTS     = ['Calibri', 'Cambria', 'Arial', 'Garamond', 'Georgia', 'Verdana']
-BULLETS   = ['•', '–', '◦', '▹']
+BULLETS   = ['•', '–', '◦', '▹','*']
 DIVIDERS  = ['─' * 40, '─' * 20 + ' § ' + '─' * 20, '·' * 40, '—' * 40]
 COLOURS   = [
     RGBColor(0x00, 0x4C, 0x99), RGBColor(0x4E, 0x9A, 0x06),
