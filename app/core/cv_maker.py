@@ -218,7 +218,7 @@ def cv_json_to_docx(payload: Dict, template: int | None = None) -> bytes:
     if template is not None:           # caller forces template 0-4
         sty['template'] = max(0, min(4, template))
     doc = Document()
-    doc.styles['Normal'].font.name, doc.styles['Normal'].font.size = sty['font'], Pt(random.randint(11,12))
+    doc.styles['Normal'].font.name, doc.styles['Normal'].font.size = sty['font'], Pt(random.randint(12,13))
 
     sec = doc.sections[0]
     for m in ('top_margin', 'bottom_margin'): setattr(sec, m, Cm(1.2))
@@ -232,7 +232,7 @@ def cv_json_to_docx(payload: Dict, template: int | None = None) -> bytes:
     name_text = f"{first} {last}".strip() or "Name"
     run = h.add_run(name_text)            # ensure at least one run
     h.alignment = sty["name_align"]
-    run.font.size = Pt(random.randint(35, 50))
+    run.font.size = Pt(random.randint(40, 50))
     run.font.color.rgb = sty["colour"]
 
     addr = pd.get('address', {})
